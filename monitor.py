@@ -70,6 +70,7 @@ class ChiselMonitor:
     _PROXY_RE = re.compile(
         r'session#(\d+).*proxy#R:(?:[\d.]+:)?(\d+)=>\S+:\s*Listening')
     _CLOSE_RE = re.compile(r'session#(\d+).*[Cc]los')
+    _SERVER_START_RE = re.compile(r'server:\s*(Listening|Fingerprint)\b')
 
     def __init__(self, registry, emit_fn=None):
         self._registry = registry
@@ -80,6 +81,7 @@ class ChiselMonitor:
         self._thread = None
         self._events = []
         self._events_lock = threading.Lock()
+        self._replaying = False
 
     def start(self):
         self._stop.clear()
@@ -119,24 +121,34 @@ class ChiselMonitor:
     def _replay_log(self):
         if not CHISEL_LOG.exists():
             return
+        self._replaying = True
         try:
             with open(CHISEL_LOG, 'r') as f:
                 for line in f:
-                    self._parse_line(line.strip())
+                    stripped = line.strip()
+                    if self._SERVER_START_RE.search(stripped):
+                        self._sessions.clear()
+                        continue
+                    self._parse_line(stripped)
                 self._file_pos = f.tell()
+
+            if self._sessions and not self._chisel_server_alive():
+                log.info("Chisel server not running — clearing %d stale "
+                         "session(s)", len(self._sessions))
+                self._sessions.clear()
+
             if self._sessions:
-                if self._chisel_server_alive():
-                    log.info("Replayed chisel log: %d active session(s)",
-                             len(self._sessions))
-                else:
-                    log.info("Replayed chisel log: %d session(s) but chisel "
-                             "server is not running — clearing stale sessions",
-                             len(self._sessions))
-                    self._sessions.clear()
-                    self._events.clear()
+                log.info("Replayed chisel log: %d active session(s)",
+                         len(self._sessions))
+                for sess in self._sessions.values():
+                    self._add_event("%s chisel connected (session #%d)"
+                                   % (sess.get("hostname", "unknown"),
+                                      sess["session_id"]))
         except Exception as e:
             log.warning("ChiselMonitor replay error: %s", e)
             self._file_pos = CHISEL_LOG.stat().st_size
+        finally:
+            self._replaying = False
 
     @staticmethod
     def _chisel_server_alive():
@@ -187,13 +199,14 @@ class ChiselMonitor:
                     "ports": {},
                     "since": time.strftime("%Y-%m-%dT%H:%M:%S"),
                 }
-                self._add_event("%s chisel connected (session #%d)" % (hostname, sess_id))
+                if not self._replaying:
+                    self._add_event("%s chisel connected (session #%d)" % (hostname, sess_id))
 
             self._sessions[sess_id]["ports"][service] = {
                 "server_port": server_port,
             }
 
-            if self._emit:
+            if not self._replaying and self._emit:
                 self._emit("chisel_update", self._sessions[sess_id])
             return
 
@@ -203,12 +216,13 @@ class ChiselMonitor:
             if sess_id in self._sessions:
                 closed = self._sessions.pop(sess_id)
                 hostname = closed.get("hostname", "unknown")
-                self._add_event("%s chisel disconnected (session #%d)" % (hostname, sess_id))
-                if self._emit:
-                    self._emit("chisel_closed", {
-                        "session_id": sess_id,
-                        "hostname": hostname,
-                    })
+                if not self._replaying:
+                    self._add_event("%s chisel disconnected (session #%d)" % (hostname, sess_id))
+                    if self._emit:
+                        self._emit("chisel_closed", {
+                            "session_id": sess_id,
+                            "hostname": hostname,
+                        })
 
 
 class ServiceHealthCheck:

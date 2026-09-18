@@ -6,7 +6,7 @@ processes on the C2 server.  Real-time dashboard on port 5900.
 No authentication — runs on the C2 server only.
 """
 
-VERSION = "1.1.7"
+VERSION = "1.1.8"
 
 import json
 import logging
@@ -83,11 +83,13 @@ def api_status():
 
     appliances = {}
 
-    def _ensure(hostname):
+    def _ensure(hostname, fallback_device_id=None):
         if hostname not in appliances:
             device_id = registry.id_for_hostname(hostname)
             if device_id is None:
-                device_id = len(appliances)
+                device_id = (fallback_device_id
+                             if fallback_device_id is not None
+                             else len(appliances))
             appliances[hostname] = {
                 "hostname": hostname,
                 "device_id": device_id,
@@ -105,19 +107,19 @@ def api_status():
     for sess in chisel_sessions.values():
         hn = sess.get("hostname")
         if hn:
-            _ensure(hn)
+            _ensure(hn, sess.get("device_id"))
             appliances[hn]["chisel"] = True
 
     for client in iodine_clients.values():
         hn = client.get("hostname")
         if hn:
-            _ensure(hn)
+            _ensure(hn, client.get("device_id"))
             appliances[hn]["dns_tunnel"] = True
 
     for sess in msf_sessions.values():
         hn = sess.get("hostname")
         if hn:
-            _ensure(hn)
+            _ensure(hn, sess.get("device_id"))
             appliances[hn]["meterpreter"] = True
 
     return jsonify({
@@ -171,11 +173,6 @@ def api_stop_all():
 @socketio.on("connect")
 def on_connect():
     socketio.emit("service_status", service_mon.get_status())
-    socketio.emit("supervisor_status", supervisor.get_status())
-    for sess in chisel_mon.get_sessions().values():
-        socketio.emit("chisel_update", sess)
-    for ev in chisel_mon.get_events():
-        socketio.emit("event", ev)
 
 
 def main():

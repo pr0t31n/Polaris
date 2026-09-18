@@ -69,17 +69,30 @@
 
   function $(id) { return document.getElementById(id); }
 
-  function setDot(el, on) {
+  function setSvc(el, on) {
     var dot = el.querySelector('.dot');
     if (dot) {
       dot.className = 'dot ' + (on ? 'on' : 'off');
     }
+    var btns = el.querySelectorAll('.btn-sm');
+    for (var i = 0; i < btns.length; i++) {
+      var b = btns[i];
+      var isStop = b.classList.contains('btn-stop');
+      var isStart = b.textContent.trim() === 'Start';
+      if (isStart) {
+        b.disabled = on;
+        b.classList.toggle('disabled', on);
+      } else if (isStop) {
+        b.disabled = !on;
+        b.classList.toggle('disabled', !on);
+      }
+    }
   }
 
   function renderServices(status) {
-    setDot($('svc-chisel'), status.chisel_server);
-    setDot($('svc-iodined'), status.iodined);
-    setDot($('svc-msf'), status.msfconsole);
+    setSvc($('svc-chisel'), status.chisel_server);
+    setSvc($('svc-iodined'), status.iodined);
+    setSvc($('svc-msf'), status.msfconsole);
   }
 
   function portLink(label, port, proto) {
@@ -102,7 +115,7 @@
     var grid = $('device-grid');
     var keys = Object.keys(devices).sort();
     if (keys.length === 0) {
-      grid.innerHTML = '<p class="muted">No devices registered</p>';
+      grid.innerHTML = '<p class="muted">No devices connected</p>';
       return;
     }
     var html = '';

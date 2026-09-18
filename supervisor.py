@@ -257,7 +257,7 @@ class Supervisor:
 
         _ufw_allow(port, "tcp")
 
-        cmd = ["chisel", "server", "--reverse", "--v", "--port", str(port)]
+        cmd = ["chisel", "server", "--reverse", "--socks5", "--v", "--port", str(port)]
 
         auth = cfg.get("auth", "")
         if auth:

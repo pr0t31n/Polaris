@@ -292,8 +292,8 @@ class Supervisor:
         key_file = cfg.get("tls_key", "")
         cert_file = cfg.get("tls_cert", "")
 
-        landnav_dir = "/opt/pr0t31n/LandNav"
-        tls_dir = os.path.join(landnav_dir, "keys")
+        polaris_dir = os.path.dirname(os.path.abspath(__file__))
+        tls_dir = os.path.join(polaris_dir, "keys")
 
         if not key_file or not cert_file or not os.path.exists(key_file):
             os.makedirs(tls_dir, exist_ok=True)

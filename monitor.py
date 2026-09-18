@@ -19,9 +19,9 @@ BASE_PORTS = {
     "socks": 1081,
 }
 
-REGISTRY_PATH = Path("/opt/pr0t31n/LandNav/device_registry.json")
+REGISTRY_PATH = Path(__file__).resolve().parent / "device_registry.json"
 CHISEL_LOG = Path("/var/log/chisel.log")
-MSF_SESSIONS_FILE = Path("/var/run/landnav_sessions.json")
+MSF_SESSIONS_FILE = Path("/var/run/polaris_sessions.json")
 
 
 class DeviceRegistry:

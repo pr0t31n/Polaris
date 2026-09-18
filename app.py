@@ -6,7 +6,7 @@ processes on the C2 server.  Real-time dashboard on port 5900.
 No authentication — runs on the C2 server only.
 """
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 import json
 import logging
@@ -23,7 +23,7 @@ from monitor import (DeviceRegistry, ChiselMonitor, ServiceHealthCheck,
 from supervisor import Supervisor
 
 _HERE = Path(__file__).resolve().parent
-CONFIG_PATH = Path("/opt/pr0t31n/LandNav/config.yaml")
+CONFIG_PATH = _HERE / "config.yaml"
 
 
 def _load_config():

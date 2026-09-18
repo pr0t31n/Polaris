@@ -41,7 +41,7 @@ Polaris (c2-server:5900)
 
 - Python 3.10+
 - Flask, Flask-SocketIO
-- LandNav `config.yaml` and `device_registry.json`
+- `config.yaml` and `device_registry.json` (shipped with Polaris)
 - chisel, iodine, msfconsole (for managed processes)
 - tmux (for interactive msfconsole access)
 
@@ -99,14 +99,14 @@ Each registered device gets sequential ports offset by device_id:
 | Source | What | How |
 |--------|------|-----|
 | `/var/log/chisel.log` | Active chisel sessions + ports | Tail + regex parse |
-| `device_registry.json` | Hostname to device_id mapping | JSON read |
-| `config.yaml` | C2 host, base ports, service config | YAML read |
+| `device_registry.json` | Hostname to device_id mapping | JSON read (Polaris repo) |
+| `config.yaml` | C2 host, base ports, service config | YAML read (Polaris repo) |
 | Process list | Service health (chisel/iodined/msf) | `pgrep` |
-| `/var/run/landnav_sessions.json` | Metasploit sessions (Phase C) | JSON read |
+| `/var/run/polaris_sessions.json` | Metasploit sessions (Phase C) | JSON read |
 | PID files (`/var/run/polaris_*.pid`) | Managed process state | PID read + kill -0 |
 
 ## Integration
 
-- **LandNav** — reads the same `config.yaml` and `device_registry.json`
+- **LandNav** — Pi-side client; Polaris owns the server-side config independently
 - **Arsenal** — registered for install/update management
 - **tmux** — msfconsole runs in `polaris-msf` session

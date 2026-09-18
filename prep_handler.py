@@ -2,11 +2,11 @@
 """Strip auto_commands.txt for SSH-tunneled ports.
 
 Lightweight helper called by Polaris supervisor before starting
-the Metasploit handler.  Reads config from LandNav's config.yaml
+the Metasploit handler.  Reads config from Polaris's config.yaml
 and strips portfwd entries that overlap with SSH or chisel tunnels.
 
 Also callable directly:
-    python3 prep_handler.py                    # Uses LandNav config.yaml
+    python3 prep_handler.py                    # Uses Polaris config.yaml
     python3 prep_handler.py -c /path/to.yaml   # Alternate config
 """
 
@@ -16,12 +16,12 @@ from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 _AUTO_CMD_PATH = _HERE / "auto_commands.txt"
-_DEFAULT_CONFIG = Path("/opt/pr0t31n/LandNav/config.yaml")
+_DEFAULT_CONFIG = _HERE / "config.yaml"
 
 
 def ensure_config_current(cfg, config_path):
     """Sync C2 server's config with config.yaml.example defaults."""
-    example_path = Path("/opt/pr0t31n/LandNav/config.yaml.example")
+    example_path = _HERE / "config.yaml.example"
     if not example_path.exists():
         return cfg
 

@@ -42,7 +42,7 @@ run -j
 
 echo ""
 echo "════════════════════════════════════════════════════"
-echo " LandNav listener active on 10.20.70.172:4443"
+echo " Polaris listener active on 10.20.70.172:4443"
 echo " SOCKS5 proxy on :1080 (routes through sessions)"
 echo " Waiting for appliance call-home..."
 echo "════════════════════════════════════════════════════"

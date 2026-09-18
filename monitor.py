@@ -68,7 +68,7 @@ class DeviceRegistry:
 class ChiselMonitor:
 
     _PROXY_RE = re.compile(
-        r'session#(\d+).*proxy#R:(\d+)=>([^:]+):(\d+):\s*Listening')
+        r'session#(\d+).*proxy#R:(?:[\d.]+:)?(\d+)=>\S+:\s*Listening')
     _CLOSE_RE = re.compile(r'session#(\d+).*[Cc]los')
 
     def __init__(self, registry, emit_fn=None):
@@ -158,8 +158,6 @@ class ChiselMonitor:
         if m:
             sess_id = int(m.group(1))
             server_port = int(m.group(2))
-            remote_host = m.group(3)
-            remote_port = int(m.group(4))
 
             device_id, service = self._registry.device_id_from_port(server_port)
             hostname = (self._registry.hostname_for_id(device_id)
@@ -177,8 +175,6 @@ class ChiselMonitor:
 
             self._sessions[sess_id]["ports"][service] = {
                 "server_port": server_port,
-                "remote_host": remote_host,
-                "remote_port": remote_port,
             }
 
             if self._emit:

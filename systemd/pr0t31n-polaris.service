@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 ExecStart=/usr/bin/python3 /opt/pr0t31n/Polaris/app.py
 WorkingDirectory=/opt/pr0t31n/Polaris
+KillMode=process
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal

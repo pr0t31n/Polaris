@@ -58,25 +58,32 @@ def install_service():
         return
 
     src = None
-    for candidate in (_HERE / "systemd" / "polaris.service", _HERE / "polaris.service"):
+    for candidate in (_HERE / "systemd" / "pr0t31n-polaris.service",):
         if candidate.exists():
             src = candidate
             break
 
     if not src:
-        print("  WARNING: polaris.service not found in repo — skipping")
+        print("  WARNING: pr0t31n-polaris.service not found in repo — skipping")
         return
 
-    dst = Path("/etc/systemd/system/polaris.service")
+    dst = Path("/etc/systemd/system/pr0t31n-polaris.service")
     print("  Installing: %s" % dst)
     shutil.copy2(src, dst)
     dst.chmod(0o644)
 
+    # Remove old service name if present
+    old = Path("/etc/systemd/system/polaris.service")
+    if old.exists():
+        _run(["systemctl", "stop", "polaris"], check=False)
+        _run(["systemctl", "disable", "polaris"], check=False)
+        old.unlink()
+
     _run(["systemctl", "daemon-reload"])
-    _run(["systemctl", "enable", "--now", "polaris"], check=False)
-    print("  polaris.service enabled and started")
-    print("  Status: sudo systemctl status polaris")
-    print("  Logs:   sudo journalctl -u polaris -f")
+    _run(["systemctl", "enable", "--now", "pr0t31n-polaris"], check=False)
+    print("  pr0t31n-polaris.service enabled and started")
+    print("  Status: sudo systemctl status pr0t31n-polaris")
+    print("  Logs:   sudo journalctl -u pr0t31n-polaris -f")
 
 
 def main():

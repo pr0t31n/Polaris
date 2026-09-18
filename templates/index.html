@@ -100,7 +100,7 @@
     if (label === 'SOCKS') {
       return '<span class="port-item socks">' + label + ' :' + port + '</span>';
     }
-    return '<a class="port-item" href="' + proto + '://' + C2_HOST + ':' + port +
+    return '<a class="port-item" href="' + proto + '://127.0.0.1:' + port +
            '" target="_blank">' + label + ' :' + port + '</a>';
   }
 

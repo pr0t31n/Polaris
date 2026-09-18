@@ -69,7 +69,7 @@ class ChiselMonitor:
 
     _PROXY_RE = re.compile(
         r'session#(\d+).*proxy#R:(?:[\d.]+:)?(\d+)=>\S+:\s*Listening')
-    _CLOSE_RE = re.compile(r'session#(\d+).*[Cc]los')
+    _CLOSE_RE = re.compile(r'session#(\d+):\s*[Cc]los')
     _SERVER_START_RE = re.compile(r'server:\s*(Listening|Fingerprint)\b')
 
     def __init__(self, registry, emit_fn=None):

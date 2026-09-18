@@ -284,6 +284,8 @@ class ServiceHealthCheck:
 
 class IodineMonitor:
 
+    _DNS0_PATH = Path("/sys/class/net/dns0")
+
     def __init__(self, registry, emit_fn=None):
         self._registry = registry
         self._emit = emit_fn
@@ -307,10 +309,53 @@ class IodineMonitor:
 
     def _run(self):
         while not self._stop.is_set():
+            self._poll()
             self._stop.wait(15)
+
+    def _poll(self):
+        if not self._DNS0_PATH.exists():
+            if self._clients:
+                self._clients.clear()
+                if self._emit:
+                    self._emit("iodine_update", {})
+            return
+
+        try:
+            r = subprocess.run(
+                ["ip", "neigh", "show", "dev", "dns0"],
+                capture_output=True, text=True, timeout=5)
+            new_clients = {}
+            for line in r.stdout.strip().splitlines():
+                parts = line.split()
+                if len(parts) < 2:
+                    continue
+                ip = parts[0]
+                state = parts[-1]
+                if state in ("REACHABLE", "STALE", "DELAY", "PROBE"):
+                    new_clients[ip] = {
+                        "tunnel_ip": ip,
+                        "state": state,
+                    }
+
+            if new_clients != self._clients:
+                self._clients = new_clients
+                if self._emit:
+                    self._emit("iodine_update",
+                               list(self._clients.values()))
+        except Exception as e:
+            log.warning("IodineMonitor poll error: %s", e)
+
+    def peer_count(self):
+        return len(self._clients)
 
 
 class MetasploitMonitor:
+
+    TMUX_SESSION = "polaris-msf"
+    _SESSION_OPEN_RE = re.compile(
+        r'Meterpreter session (\d+) opened \(([^)]+)\)')
+    _SESSION_CLOSE_RE = re.compile(
+        r'session (\d+) closed')
 
     def __init__(self, registry, emit_fn=None):
         self._registry = registry
@@ -318,6 +363,7 @@ class MetasploitMonitor:
         self._sessions = {}
         self._stop = threading.Event()
         self._thread = None
+        self._seen_lines = set()
 
     def start(self):
         self._stop.clear()
@@ -335,10 +381,56 @@ class MetasploitMonitor:
 
     def _run(self):
         while not self._stop.is_set():
-            self._poll()
+            self._poll_tmux()
+            self._poll_file()
             self._stop.wait(10)
 
-    def _poll(self):
+    def _poll_tmux(self):
+        try:
+            r = subprocess.run(
+                ["tmux", "capture-pane", "-t", self.TMUX_SESSION,
+                 "-p", "-S", "-200"],
+                capture_output=True, text=True, timeout=5)
+            if r.returncode != 0:
+                return
+            changed = False
+            for line in r.stdout.splitlines():
+                line = line.strip()
+                if not line or line in self._seen_lines:
+                    continue
+                self._seen_lines.add(line)
+                if len(self._seen_lines) > 2000:
+                    self._seen_lines = set(list(self._seen_lines)[-1000:])
+
+                m = self._SESSION_OPEN_RE.search(line)
+                if m:
+                    sid = int(m.group(1))
+                    conn = m.group(2)
+                    remote_ip = self._extract_remote_ip(conn)
+                    hostname = self._hostname_from_ip(remote_ip)
+                    self._sessions[sid] = {
+                        "session_id": sid,
+                        "connection": conn,
+                        "remote_ip": remote_ip,
+                        "hostname": hostname,
+                    }
+                    changed = True
+                    continue
+
+                m = self._SESSION_CLOSE_RE.search(line)
+                if m:
+                    sid = int(m.group(1))
+                    if sid in self._sessions:
+                        del self._sessions[sid]
+                        changed = True
+
+            if changed and self._emit:
+                self._emit("msf_sessions",
+                           list(self._sessions.values()))
+        except Exception as e:
+            log.warning("MetasploitMonitor tmux poll error: %s", e)
+
+    def _poll_file(self):
         if not MSF_SESSIONS_FILE.exists():
             return
         try:
@@ -355,3 +447,16 @@ class MetasploitMonitor:
                                    list(self._sessions.values()))
         except Exception:
             pass
+
+    @staticmethod
+    def _extract_remote_ip(conn):
+        parts = conn.split(" -> ")
+        if len(parts) == 2:
+            remote = parts[1]
+        else:
+            remote = conn
+        ip = remote.split(":")[0] if ":" in remote else remote
+        return ip.strip()
+
+    def _hostname_from_ip(self, ip):
+        return None

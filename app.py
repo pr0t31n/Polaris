@@ -6,7 +6,7 @@ processes on the C2 server.  Real-time dashboard on port 5900.
 No authentication — runs on the C2 server only.
 """
 
-VERSION = "1.1.8"
+VERSION = "1.1.9"
 
 import json
 import logging
@@ -110,17 +110,24 @@ def api_status():
             _ensure(hn, sess.get("device_id"))
             appliances[hn]["chisel"] = True
 
-    for client in iodine_clients.values():
-        hn = client.get("hostname")
-        if hn:
-            _ensure(hn, client.get("device_id"))
-            appliances[hn]["dns_tunnel"] = True
+    iodine_peer_count = len(iodine_clients)
+    if iodine_peer_count > 0 and services.get("iodined"):
+        for a in appliances.values():
+            if a["chisel"]:
+                a["dns_tunnel"] = True
 
-    for sess in msf_sessions.values():
-        hn = sess.get("hostname")
-        if hn:
-            _ensure(hn, sess.get("device_id"))
-            appliances[hn]["meterpreter"] = True
+    msf_count = len(msf_sessions)
+    if msf_count > 0 and services.get("msfconsole"):
+        matched = set()
+        for sess in msf_sessions.values():
+            hn = sess.get("hostname")
+            if hn and hn in appliances:
+                appliances[hn]["meterpreter"] = True
+                matched.add(hn)
+        if not matched:
+            for a in appliances.values():
+                if a["chisel"]:
+                    a["meterpreter"] = True
 
     return jsonify({
         "services": services,

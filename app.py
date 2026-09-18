@@ -6,7 +6,7 @@ processes on the C2 server.  Real-time dashboard on port 5900.
 No authentication — runs on the C2 server only.
 """
 
-VERSION = "1.1.4"
+VERSION = "1.1.5"
 
 import json
 import logging

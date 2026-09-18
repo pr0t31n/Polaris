@@ -110,12 +110,26 @@ class ChiselMonitor:
             self._emit("event", entry)
 
     def _run(self):
-        if CHISEL_LOG.exists():
-            self._file_pos = CHISEL_LOG.stat().st_size
+        self._replay_log()
 
         while not self._stop.is_set():
             self._poll()
             self._stop.wait(2)
+
+    def _replay_log(self):
+        if not CHISEL_LOG.exists():
+            return
+        try:
+            with open(CHISEL_LOG, 'r') as f:
+                for line in f:
+                    self._parse_line(line.strip())
+                self._file_pos = f.tell()
+            if self._sessions:
+                log.info("Replayed chisel log: %d active session(s)",
+                         len(self._sessions))
+        except Exception as e:
+            log.warning("ChiselMonitor replay error: %s", e)
+            self._file_pos = CHISEL_LOG.stat().st_size
 
     def _poll(self):
         if not CHISEL_LOG.exists():

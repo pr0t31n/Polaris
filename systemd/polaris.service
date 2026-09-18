@@ -1,0 +1,17 @@
+[Unit]
+Description=Polaris C2 Server Manager
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/pr0t31n/Polaris/app.py
+WorkingDirectory=/opt/pr0t31n/Polaris
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

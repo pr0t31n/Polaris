@@ -286,12 +286,21 @@ class IodineMonitor:
 
     _DNS0_PATH = Path("/sys/class/net/dns0")
 
-    def __init__(self, registry, emit_fn=None):
+    def __init__(self, registry, emit_fn=None, tunnel_net="10.53.53.1/24"):
         self._registry = registry
         self._emit = emit_fn
         self._clients = {}
         self._stop = threading.Event()
         self._thread = None
+        self._tunnel_base = self._parse_tunnel_base(tunnel_net)
+
+    @staticmethod
+    def _parse_tunnel_base(tunnel_net):
+        ip_part = tunnel_net.split("/")[0]
+        octets = ip_part.split(".")
+        if len(octets) == 4:
+            return ".".join(octets[:3])
+        return "10.53.53"
 
     def start(self):
         self._stop.clear()
@@ -320,30 +329,26 @@ class IodineMonitor:
                     self._emit("iodine_update", {})
             return
 
-        try:
-            r = subprocess.run(
-                ["ip", "neigh", "show", "dev", "dns0"],
-                capture_output=True, text=True, timeout=5)
-            new_clients = {}
-            for line in r.stdout.strip().splitlines():
-                parts = line.split()
-                if len(parts) < 2:
-                    continue
-                ip = parts[0]
-                state = parts[-1]
-                if state in ("REACHABLE", "STALE", "DELAY", "PROBE"):
+        new_clients = {}
+        for i in range(2, 11):
+            ip = "%s.%d" % (self._tunnel_base, i)
+            try:
+                r = subprocess.run(
+                    ["ping", "-c", "1", "-W", "1", ip],
+                    capture_output=True, timeout=3)
+                if r.returncode == 0:
                     new_clients[ip] = {
                         "tunnel_ip": ip,
-                        "state": state,
+                        "state": "REACHABLE",
                     }
+            except Exception:
+                pass
 
-            if new_clients != self._clients:
-                self._clients = new_clients
-                if self._emit:
-                    self._emit("iodine_update",
-                               list(self._clients.values()))
-        except Exception as e:
-            log.warning("IodineMonitor poll error: %s", e)
+        if new_clients != self._clients:
+            self._clients = new_clients
+            if self._emit:
+                self._emit("iodine_update",
+                           list(self._clients.values()))
 
     def peer_count(self):
         return len(self._clients)

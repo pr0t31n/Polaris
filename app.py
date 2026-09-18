@@ -6,7 +6,7 @@ processes on the C2 server.  Real-time dashboard on port 5900.
 No authentication — runs on the C2 server only.
 """
 
-VERSION = "1.1.9"
+VERSION = "1.2.0"
 
 import json
 import logging
@@ -58,7 +58,8 @@ def _emit(event, data):
 
 chisel_mon = ChiselMonitor(registry, emit_fn=_emit)
 service_mon = ServiceHealthCheck(emit_fn=_emit)
-iodine_mon = IodineMonitor(registry, emit_fn=_emit)
+_tunnel_net = cfg.get("dns_tunnel", {}).get("tunnel_net", "10.53.53.1/24")
+iodine_mon = IodineMonitor(registry, emit_fn=_emit, tunnel_net=_tunnel_net)
 msf_mon = MetasploitMonitor(registry, emit_fn=_emit)
 
 

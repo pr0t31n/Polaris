@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polaris</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+  <h1>Polaris</h1>
+  <span class="version">v{{ version }}</span>
+</header>
+
+<section id="services" class="services-bar">
+  <div class="svc-controls">
+    <button class="btn btn-start" onclick="svcAction('start-all')">Start All</button>
+    <button class="btn btn-stop" onclick="svcAction('stop-all')">Stop All</button>
+  </div>
+  <div class="svc-row">
+    <div class="svc" id="svc-chisel">
+      <span class="dot off"></span> Chisel Server
+      <span class="svc-btns">
+        <button class="btn-sm" onclick="svcAction('service/chisel_server/start')">Start</button>
+        <button class="btn-sm btn-stop" onclick="svcAction('service/chisel_server/stop')">Stop</button>
+        <button class="btn-sm" onclick="svcAction('service/chisel_server/restart')">Restart</button>
+      </span>
+    </div>
+    <div class="svc" id="svc-iodined">
+      <span class="dot off"></span> iodined
+      <span class="svc-btns">
+        <button class="btn-sm" onclick="svcAction('service/iodined/start')">Start</button>
+        <button class="btn-sm btn-stop" onclick="svcAction('service/iodined/stop')">Stop</button>
+        <button class="btn-sm" onclick="svcAction('service/iodined/restart')">Restart</button>
+      </span>
+    </div>
+    <div class="svc" id="svc-msf">
+      <span class="dot off"></span> Metasploit
+      <span class="svc-btns">
+        <button class="btn-sm" onclick="svcAction('service/msfconsole/start')">Start</button>
+        <button class="btn-sm btn-stop" onclick="svcAction('service/msfconsole/stop')">Stop</button>
+        <button class="btn-sm" onclick="svcAction('service/msfconsole/restart')">Restart</button>
+      </span>
+    </div>
+  </div>
+</section>
+
+<section id="appliances" class="appliances">
+  <h2>Connected Appliances</h2>
+  <div id="device-grid" class="device-grid">
+    <p class="muted">Loading...</p>
+  </div>
+</section>
+
+<section id="log-section" class="log-section">
+  <h2>Event Log</h2>
+  <div id="event-log" class="event-log"></div>
+</section>
+
+<script src="/static/socket.io.min.js"></script>
+<script>
+(function() {
+  var C2_HOST = {{ c2_host|tojson }};
+  var BASE_PORTS = {{ base_ports|safe }};
+  var socket = io();
+  var devices = {};
+  var events = [];
+
+  function $(id) { return document.getElementById(id); }
+
+  function setDot(el, on) {
+    var dot = el.querySelector('.dot');
+    if (dot) {
+      dot.className = 'dot ' + (on ? 'on' : 'off');
+    }
+  }
+
+  function renderServices(status) {
+    setDot($('svc-chisel'), status.chisel_server);
+    setDot($('svc-iodined'), status.iodined);
+    setDot($('svc-msf'), status.msfconsole);
+  }
+
+  function portLink(label, port, proto) {
+    proto = proto || 'https';
+    if (label === 'SOCKS') {
+      return '<span class="port-item socks">' + label + ' :' + port + '</span>';
+    }
+    return '<a class="port-item" href="' + proto + '://' + C2_HOST + ':' + port +
+           '" target="_blank">' + label + ' :' + port + '</a>';
+  }
+
+  function transportDot(connected, label) {
+    var cls = connected ? 'on' : 'off';
+    var txt = connected ? 'Connected' : 'Not connected';
+    return '<div class="transport"><span class="dot ' + cls + '"></span> ' +
+           label + ': ' + txt + '</div>';
+  }
+
+  function renderDevices() {
+    var grid = $('device-grid');
+    var keys = Object.keys(devices).sort();
+    if (keys.length === 0) {
+      grid.innerHTML = '<p class="muted">No devices registered</p>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < keys.length; i++) {
+      var d = devices[keys[i]];
+      var anyConn = d.chisel || d.dns_tunnel || d.meterpreter;
+      var cardCls = 'device-card' + (anyConn ? ' connected' : '');
+      html += '<div class="' + cardCls + '">';
+      html += '<h3>' + d.hostname + ' <small>(device_id=' + d.device_id + ')</small></h3>';
+      html += '<div class="transports">';
+      html += transportDot(d.chisel, 'Chisel');
+      html += transportDot(d.dns_tunnel, 'DNS Tunnel');
+      html += transportDot(d.meterpreter, 'Meterpreter');
+      html += '</div>';
+      html += '<div class="ports">';
+      html += portLink('Vantage', d.ports.vantage, 'https');
+      html += portLink('Crucible', d.ports.crucible, 'https');
+      html += portLink('Nessus', d.ports.nessus, 'https');
+      html += portLink('SOCKS', d.ports.socks);
+      html += '</div>';
+      html += '</div>';
+    }
+    grid.innerHTML = html;
+  }
+
+  function addEvent(ev) {
+    events.push(ev);
+    if (events.length > 100) events = events.slice(-100);
+    var el = $('event-log');
+    var line = document.createElement('div');
+    line.className = 'log-line';
+    line.textContent = ev.ts + '  ' + ev.msg;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  window.svcAction = function(endpoint) {
+    fetch('/api/' + endpoint, { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var msg = data.msg || JSON.stringify(data);
+        addEvent({ ts: new Date().toTimeString().slice(0,8), msg: msg });
+        setTimeout(fetchStatus, 1500);
+      })
+      .catch(function(e) {
+        addEvent({ ts: new Date().toTimeString().slice(0,8), msg: 'Error: ' + e });
+      });
+  };
+
+  function fetchStatus() {
+    fetch('/api/status')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        renderServices(data.services || {});
+        devices = data.appliances || {};
+        renderDevices();
+        if (data.events) {
+          $('event-log').innerHTML = '';
+          events = [];
+          for (var i = 0; i < data.events.length; i++) {
+            addEvent(data.events[i]);
+          }
+        }
+      })
+      .catch(function(e) { console.error('Status fetch error:', e); });
+  }
+
+  socket.on('service_status', function(data) {
+    renderServices(data);
+  });
+
+  socket.on('supervisor_status', function(data) {
+    // could render PID/uptime info later
+  });
+
+  socket.on('chisel_update', function(sess) {
+    var hn = sess.hostname;
+    if (hn && devices[hn]) {
+      devices[hn].chisel = true;
+      renderDevices();
+    }
+  });
+
+  socket.on('chisel_closed', function(data) {
+    var hn = data.hostname;
+    if (hn && devices[hn]) {
+      devices[hn].chisel = false;
+      renderDevices();
+    }
+  });
+
+  socket.on('event', function(ev) {
+    addEvent(ev);
+  });
+
+  socket.on('msf_sessions', function(sessions) {
+    for (var hn in devices) { devices[hn].meterpreter = false; }
+    for (var i = 0; i < sessions.length; i++) {
+      var s = sessions[i];
+      if (s.hostname && devices[s.hostname]) {
+        devices[s.hostname].meterpreter = true;
+      }
+    }
+    renderDevices();
+  });
+
+  fetchStatus();
+  setInterval(fetchStatus, 15000);
+})();
+</script>
+</body>
+</html>

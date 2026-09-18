@@ -6,7 +6,7 @@ processes on the C2 server.  Real-time dashboard on port 5900.
 No authentication — runs on the C2 server only.
 """
 
-VERSION = "1.1.2"
+VERSION = "1.1.3"
 
 import json
 import logging
@@ -82,34 +82,42 @@ def api_status():
     sup_status = supervisor.get_status()
 
     appliances = {}
-    for hostname, device_id in devices.items():
-        appliances[hostname] = {
-            "hostname": hostname,
-            "device_id": device_id,
-            "chisel": False,
-            "dns_tunnel": False,
-            "meterpreter": False,
-            "ports": {
-                "vantage": BASE_PORTS["vantage"] + device_id,
-                "crucible": BASE_PORTS["crucible"] + device_id,
-                "nessus": BASE_PORTS["nessus"] + device_id,
-                "socks": BASE_PORTS["socks"] + device_id,
-            },
-        }
+
+    def _ensure(hostname):
+        if hostname not in appliances:
+            device_id = registry.device_id(hostname)
+            if device_id is None:
+                device_id = len(appliances)
+            appliances[hostname] = {
+                "hostname": hostname,
+                "device_id": device_id,
+                "chisel": False,
+                "dns_tunnel": False,
+                "meterpreter": False,
+                "ports": {
+                    "vantage": BASE_PORTS["vantage"] + device_id,
+                    "crucible": BASE_PORTS["crucible"] + device_id,
+                    "nessus": BASE_PORTS["nessus"] + device_id,
+                    "socks": BASE_PORTS["socks"] + device_id,
+                },
+            }
 
     for sess in chisel_sessions.values():
         hn = sess.get("hostname")
-        if hn and hn in appliances:
+        if hn:
+            _ensure(hn)
             appliances[hn]["chisel"] = True
 
     for client in iodine_clients.values():
         hn = client.get("hostname")
-        if hn and hn in appliances:
+        if hn:
+            _ensure(hn)
             appliances[hn]["dns_tunnel"] = True
 
     for sess in msf_sessions.values():
         hn = sess.get("hostname")
-        if hn and hn in appliances:
+        if hn:
+            _ensure(hn)
             appliances[hn]["meterpreter"] = True
 
     return jsonify({

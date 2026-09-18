@@ -48,8 +48,35 @@ def download_socketio_js():
 
 
 def create_dirs():
-    for d in ["templates", "static"]:
+    for d in ["templates", "static", "keys"]:
         (_HERE / d).mkdir(parents=True, exist_ok=True)
+
+
+def install_service():
+    if not _has("systemctl"):
+        print("  systemd not found — skipping service install")
+        return
+
+    src = None
+    for candidate in (_HERE / "systemd" / "polaris.service", _HERE / "polaris.service"):
+        if candidate.exists():
+            src = candidate
+            break
+
+    if not src:
+        print("  WARNING: polaris.service not found in repo — skipping")
+        return
+
+    dst = Path("/etc/systemd/system/polaris.service")
+    print("  Installing: %s" % dst)
+    shutil.copy2(src, dst)
+    dst.chmod(0o644)
+
+    _run(["systemctl", "daemon-reload"])
+    _run(["systemctl", "enable", "--now", "polaris"], check=False)
+    print("  polaris.service enabled and started")
+    print("  Status: sudo systemctl status polaris")
+    print("  Logs:   sudo journalctl -u polaris -f")
 
 
 def main():
@@ -63,10 +90,11 @@ def main():
     create_dirs()
     install_pip_deps()
     download_socketio_js()
+    install_service()
 
     print()
     print("%s installed." % TOOL_NAME)
-    print("Start with: python3 app.py")
+    print("Dashboard: http://localhost:5900")
 
 
 if __name__ == "__main__":

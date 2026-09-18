@@ -125,11 +125,27 @@ class ChiselMonitor:
                     self._parse_line(line.strip())
                 self._file_pos = f.tell()
             if self._sessions:
-                log.info("Replayed chisel log: %d active session(s)",
-                         len(self._sessions))
+                if self._chisel_server_alive():
+                    log.info("Replayed chisel log: %d active session(s)",
+                             len(self._sessions))
+                else:
+                    log.info("Replayed chisel log: %d session(s) but chisel "
+                             "server is not running — clearing stale sessions",
+                             len(self._sessions))
+                    self._sessions.clear()
+                    self._events.clear()
         except Exception as e:
             log.warning("ChiselMonitor replay error: %s", e)
             self._file_pos = CHISEL_LOG.stat().st_size
+
+    @staticmethod
+    def _chisel_server_alive():
+        try:
+            r = subprocess.run(["pgrep", "-f", "chisel server"],
+                               capture_output=True, timeout=5)
+            return r.returncode == 0
+        except Exception:
+            return False
 
     def _poll(self):
         if not CHISEL_LOG.exists():

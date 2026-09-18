@@ -6,7 +6,7 @@ processes on the C2 server.  Real-time dashboard on port 5900.
 No authentication — runs on the C2 server only.
 """
 
-VERSION = "1.1.6"
+VERSION = "1.1.7"
 
 import json
 import logging
@@ -85,7 +85,7 @@ def api_status():
 
     def _ensure(hostname):
         if hostname not in appliances:
-            device_id = registry.device_id(hostname)
+            device_id = registry.id_for_hostname(hostname)
             if device_id is None:
                 device_id = len(appliances)
             appliances[hostname] = {

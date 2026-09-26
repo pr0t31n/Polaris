@@ -6,7 +6,7 @@ processes on the C2 server.  Real-time dashboard on port 5900.
 No authentication — runs on the C2 server only.
 """
 
-VERSION = "1.2.3"
+VERSION = Path(__file__).resolve().parent.joinpath("VERSION").read_text().strip()
 
 import json
 import logging

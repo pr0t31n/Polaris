@@ -25,11 +25,38 @@ def _has(binary):
     return shutil.which(binary) is not None
 
 
+def _pip_installed(pkg_spec):
+    import importlib.util
+    name = pkg_spec.split(">=")[0].split("==")[0].split("[")[0].split("<")[0].strip()
+    _IMPORT_MAP = {
+        "flask-socketio": "flask_socketio",
+        "flask-cors": "flask_cors",
+        "python-engineio": "engineio",
+        "python-socketio": "socketio",
+        "pyyaml": "yaml",
+        "PyYAML": "yaml",
+    }
+    mod = _IMPORT_MAP.get(name, name.replace("-", "_"))
+    try:
+        return importlib.util.find_spec(mod) is not None
+    except (ModuleNotFoundError, ValueError):
+        return False
+
+
 def install_pip_deps():
     req = _HERE / "requirements.txt"
-    if req.exists():
-        _run([sys.executable, "-m", "pip", "install",
-              "--break-system-packages", "-r", str(req)])
+    if not req.exists():
+        return
+    pip_cmd = [sys.executable, "-m", "pip"]
+    for line in req.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith("-"):
+            continue
+        if _pip_installed(line):
+            print("  [+] %s already installed" % line)
+            continue
+        print("  [*] pip install %s ..." % line)
+        _run(pip_cmd + ["install", "--break-system-packages", line], check=False)
 
 
 def download_socketio_js():

@@ -1,6 +1,6 @@
 # Polaris
 
-C2 server manager and real-time connection dashboard for the LandNav rogue device platform. Runs on the C2 server (the C2 server) and manages all server-side processes.
+C2 server manager and real-time connection dashboard for the LandNav rogue device platform. Runs on the C2 server and manages all server-side processes.
 
 ## Features
 
@@ -58,7 +58,7 @@ python3 install.py
 python3 app.py
 ```
 
-Dashboard available at `http://c2-server:5900`
+Dashboard available at `http://<c2-server>:5900`
 
 ### Service Control
 

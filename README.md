@@ -9,7 +9,7 @@ C2 server manager and real-time connection dashboard for the LandNav rogue devic
 - **Chisel session tracking** — parses `/var/log/chisel.log` for active reverse tunnel sessions, maps server-side ports to registered devices
 - **Service health** — monitors chisel server, iodined, and msfconsole process status
 - **Device registry integration** — reads `device_registry.json` for hostname-to-device_id mapping
-- **Clickable port links** — direct access to forwarded Vantage, Crucible, and Nessus instances per device
+- **Clickable port links** — direct access to forwarded Crucible, Gauntlet, and Nessus instances per device
 - **Real-time updates** — SocketIO pushes connection/disconnection events to the dashboard instantly
 - **tmux integration** — msfconsole runs in a named tmux session (`polaris-msf`) for interactive access
 - **Port conflict handling** — detects and resolves conflicts on chisel server port (kills stale processes, stops meshcentral)
@@ -89,7 +89,7 @@ Each registered device gets sequential ports offset by device_id:
 
 | Service  | Base Port | Device 0  | Device 1  |
 |----------|-----------|-----------|-----------|
-| Vantage  | 25100     | 25100     | 25101     |
+| Crucible | 25100     | 25100     | 25101     |
 | Crucible | 25500     | 25500     | 25501     |
 | Nessus   | 28834     | 28834     | 28835     |
 | SOCKS    | 1081      | 1081      | 1082      |

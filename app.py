@@ -98,7 +98,6 @@ def api_status():
                 "dns_tunnel": False,
                 "meterpreter": False,
                 "ports": {
-                    "vantage": BASE_PORTS["vantage"] + device_id,
                     "crucible": BASE_PORTS["crucible"] + device_id,
                     "nessus": BASE_PORTS["nessus"] + device_id,
                     "socks": BASE_PORTS["socks"] + device_id,

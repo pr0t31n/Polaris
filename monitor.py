@@ -13,7 +13,6 @@ from pathlib import Path
 log = logging.getLogger("polaris.monitor")
 
 BASE_PORTS = {
-    "vantage": 25100,
     "crucible": 25500,
     "nessus": 28834,
     "socks": 1081,

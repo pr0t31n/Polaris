@@ -2,6 +2,9 @@
 
 C2 server manager and real-time connection dashboard for the LandNav rogue device platform. Runs on the C2 server and manages all server-side processes.
 
+
+> **[View full documentation on the Codex Wiki](https://wiki.pr0t31n.com/tools/polaris)** — detailed features, CLI reference, findings catalogue, and integration guides.
+
 ## Features
 
 - **Process supervisor** — starts, stops, restarts, and monitors chisel server, iodined, and msfconsole as independent detached processes
